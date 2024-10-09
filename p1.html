@@ -33,8 +33,8 @@
 
   <script>
     // Load data from CSV file
-    d3.csv('summed_wildfires_by_year.csv').then((data) => {
-      console.log(data);
+    d3.csv('new_fire_data.csv').then((data) => {
+      // console.log(data);
 
       // Set up the margins and dimensions of the chart
       var margin = { top: 50, right: 150, bottom: 50, left: 100 };
@@ -48,34 +48,38 @@
         .append("g")
         .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-      var countries = ['USA', 'Canada', 'Brazil', 'Russia', 'Spain'];
+      var countries = ['United States', 'Canada', 'Brazil', 'Australia'];
 
       // Extend the years from 2010 to 2025
-      var years = [2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019,
-        2020, 2021, 2022, 2023, 2024, 2025];
+      var years = [2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019,
+        2020, 2021, 2022, 2023, 2024];
 
       // Prepare the data by creating an array with country, year, and area burned values
+
+    
       var formattedData = [];
       data.forEach(function (d) {
         if (countries.includes(d.Entity)) {
+          console.log(d)
           years.forEach(function (year) {
             formattedData.push({
               country: d.Entity,
               year: year,
-              area: +d[`area burnt by wildfires in ${year}`] || 0  // Ensure numeric parsing
+              area: d[year.toString()] // Ensure numeric parsing
             });
           });
         }
       });
+      console.log(formattedData);
 
       // Set up the x-axis with extended years (2010 to 2025)
       var xScale = d3.scaleLinear()
-        .domain([2010, 2025])  // Extended domain for more years
+        .domain([2012, 2024])  // Extended domain for more years
         .range([0, width]);
 
       // Set up the y-axis to show a larger range of burned areas
       var yScale = d3.scaleLinear()
-        .domain([0, d3.max(formattedData, d => d.area) * 1.2])  // Extend domain for larger range
+        .domain([0, d3.max(formattedData, d => +d.area) ])  // Extend domain for larger range
         .range([height, 0]);
 
       var colorScale = d3.scaleOrdinal(d3.schemeSet2).domain(countries);
@@ -136,35 +140,47 @@
 
       // Nest data by country for separate lines
       var nestedData = d3.groups(formattedData, d => d.country);
+      console.log(nestedData)
 
       // Draw lines and animate circles on data points
       nestedData.forEach(function (countryData) {
         var country = countryData[0];
         var dataPoints = countryData[1];
+        dataPoints.forEach( function(d) {
+          console.log(d)
+          svg.append("line")
+          .attr("x1", xScale(d.year))
+          .attr("x2", xScale(d.year))
+          .attr("y1", height)
+          .attr("y2", yScale(d['area']))
+          .style("stroke",colorScale(country))
+          .style("stroke-width",10)
+        })
+        
 
-        // Draw line for each country
-        svg.append("path")
-          .datum(dataPoints)
-          .attr("fill", "none")
-          .attr("stroke", colorScale(country))
-          .attr("stroke-width", 2)
-          .attr("d", line);
+        // // Draw line for each country
+        // svg.append("path")
+        //   .datum(dataPoints)
+        //   .attr("fill", "none")
+        //   .attr("stroke", colorScale(country))
+        //   .attr("stroke-width", 2)
+        //   .attr("d", line);
 
-        // Draw circles on each data point with an animation
-        svg.selectAll("circle." + country)
-          .data(dataPoints)
-          .enter()
-          .append("circle")
-          .attr("class", country)
-          .attr("cx", d => xScale(d.year))
-          .attr("cy", d => yScale(d.area))
-          .attr("r", 0)  // Start with radius 0
-          .style("fill", colorScale(country))
-          .style("stroke", "white")
-          .style("stroke-width", 1)
-          .transition()  // Animate the transition
-          .duration(1000)
-          .attr("r", 4);  // Animate to radius 4
+        // // Draw circles on each data point with an animation
+        // svg.selectAll("circle." + country)
+        //   .data(dataPoints)
+        //   .enter()
+        //   .append("circle")
+        //   .attr("class", country)
+        //   .attr("cx", d => xScale(d.year))
+        //   .attr("cy", d => yScale(d.area))
+        //   .attr("r", 0)  // Start with radius 0
+        //   .style("fill", colorScale(country))
+        //   .style("stroke", "white")
+        //   .style("stroke-width", 1)
+        //   .transition()  // Animate the transition
+        //   .duration(1000)
+        //   .attr("r", 4);  // Animate to radius 4
       });
 
       // Add legend for countries
