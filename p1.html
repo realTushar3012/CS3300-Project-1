@@ -1,59 +1,194 @@
 <html>
-  <head>
-    <!--- D3 IMPORT HERE --->
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    <!--- D3 IMPORT HERE --->
-    <style>
-      /* Styling for the gridlines */
-      .gridlines line {
-        stroke: #bbb;  /* Light gray lines for gridlines */
-      }
-      
-      .gridlines .domain {
-        stroke: none;  /* Remove axis domain line */
-      }
 
-      .axis-label {
-        font-family: Arial, sans-serif;
-        font-size: 12px;
-        fill: white; /* Adjust color if needed */
-      }
-    </style>
-  </head>
+<head>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    .gridlines line {
+      stroke: #ddd;
+    }
 
-  
-  <body>
-    <p style="margin-top: 50px;"> Project 1 </p>
-    <svg id="q2" height="600" width="600" style="border: 1px solid black; background-color: black;"></svg>
-    <script>
+    .gridlines .domain {
+      stroke: none;
+    }
 
-      d3.json('chip_dataset.json').then( (data) => {
-        var margin = {top : 50, right:50, botton:50, left: 70 }
-        width = 600 - margin.left - margin.right,
-        height = 600 - margin.top - margin.bottom;
+    .axis-label {
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      fill: white;
+    }
 
-        // select the svg element and set width and height
-        var svg = d3.select("#q2")
-            .attr("width", width + margin.left + margin.right)
-            .attr("height", height + margin.top + margin.bottom)
-          .append("g")
-            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
-            
-        const yearExtent = d3.extent(data, d => d['Release Day']);
-        const releaseDayScale = d3.scaleLinear()
-                                    .domain(releaseDayExtent)
-                                    .range([0, chartWidth]);
-        const transistorsExtend = d3.extent(data, d => d['Transistors(million)']);
-        const transistorsScale = d3.scaleLog()
-                                      .domain(transistorsExtend)
-                                      .range([chartHeight, 0]);
+    .title {
+      font-size: 16px;
+      fill: white;
+      text-anchor: middle;
+    }
+  </style>
+</head>
 
-    })
-    </script> 
-    
-    
-  </body>
+<body>
+  <p style="margin-top: 50px;"> Wildfire Data Visualization </p>
 
+  <!-- Create an SVG element with larger dimensions -->
+  <svg id="q2" height="700" width="1000" style="border: 1px solid black; background-color: black;"></svg>
 
-  
+  <script>
+    // Load data from CSV file
+    d3.csv('summed_wildfires_by_year.csv').then((data) => {
+      console.log(data);
+
+      // Set up the margins and dimensions of the chart
+      var margin = { top: 50, right: 150, bottom: 50, left: 100 };
+      var width = 1000 - margin.left - margin.right;
+      var height = 700 - margin.top - margin.bottom;
+
+      // Create the main SVG group element
+      var svg = d3.select("#q2")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+        .append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+      var countries = ['USA', 'Canada', 'Brazil', 'Russia', 'Spain'];
+
+      // Extend the years from 2010 to 2025
+      var years = [2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019,
+        2020, 2021, 2022, 2023, 2024, 2025];
+
+      // Prepare the data by creating an array with country, year, and area burned values
+      var formattedData = [];
+      data.forEach(function (d) {
+        if (countries.includes(d.Entity)) {
+          years.forEach(function (year) {
+            formattedData.push({
+              country: d.Entity,
+              year: year,
+              area: +d[`area burnt by wildfires in ${year}`] || 0  // Ensure numeric parsing
+            });
+          });
+        }
+      });
+
+      // Set up the x-axis with extended years (2010 to 2025)
+      var xScale = d3.scaleLinear()
+        .domain([2010, 2025])  // Extended domain for more years
+        .range([0, width]);
+
+      // Set up the y-axis to show a larger range of burned areas
+      var yScale = d3.scaleLinear()
+        .domain([0, d3.max(formattedData, d => d.area) * 1.2])  // Extend domain for larger range
+        .range([height, 0]);
+
+      var colorScale = d3.scaleOrdinal(d3.schemeSet2).domain(countries);
+
+      // Add x-axis to the chart
+      var xAxis = d3.axisBottom(xScale).ticks(10).tickFormat(d3.format("d"));
+      svg.append("g")
+        .attr("transform", "translate(0," + height + ")")
+        .call(xAxis)
+        .selectAll("text")
+        .style("fill", "white");
+
+      // Add y-axis to the chart
+      var yAxis = d3.axisLeft(yScale);
+      svg.append("g")
+        .call(yAxis)
+        .selectAll("text")
+        .style("fill", "white");
+
+      // Add y-axis label
+      svg.append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("y", -70)
+        .attr("x", -height / 2)
+        .attr("dy", "1em")
+        .attr("fill", "white")
+        .text("Area Burned by Wildfires (ha)");
+
+      // Add chart title
+      svg.append("text")
+        .attr("x", width / 2)
+        .attr("y", -20)
+        .attr("class", "title")
+        .text("Area Burned by Wildfires in Selected Countries (2010-2025)");
+
+      // Add horizontal gridlines
+      var yGridlines = d3.axisLeft(yScale)
+        .tickSize(-width)
+        .tickFormat("");
+      svg.append("g")
+        .attr("class", "gridlines")
+        .call(yGridlines);
+
+      // Add vertical gridlines
+      var xGridlines = d3.axisBottom(xScale)
+        .tickSize(-height)
+        .tickFormat("")
+        .ticks(10);
+      svg.append("g")
+        .attr("class", "gridlines")
+        .attr("transform", "translate(0," + height + ")")
+        .call(xGridlines);
+
+      // Define the line generator function for plotting data points
+      var line = d3.line()
+        .x(d => xScale(d.year))
+        .y(d => yScale(d.area));
+
+      // Nest data by country for separate lines
+      var nestedData = d3.groups(formattedData, d => d.country);
+
+      // Draw lines and animate circles on data points
+      nestedData.forEach(function (countryData) {
+        var country = countryData[0];
+        var dataPoints = countryData[1];
+
+        // Draw line for each country
+        svg.append("path")
+          .datum(dataPoints)
+          .attr("fill", "none")
+          .attr("stroke", colorScale(country))
+          .attr("stroke-width", 2)
+          .attr("d", line);
+
+        // Draw circles on each data point with an animation
+        svg.selectAll("circle." + country)
+          .data(dataPoints)
+          .enter()
+          .append("circle")
+          .attr("class", country)
+          .attr("cx", d => xScale(d.year))
+          .attr("cy", d => yScale(d.area))
+          .attr("r", 0)  // Start with radius 0
+          .style("fill", colorScale(country))
+          .style("stroke", "white")
+          .style("stroke-width", 1)
+          .transition()  // Animate the transition
+          .duration(1000)
+          .attr("r", 4);  // Animate to radius 4
+      });
+
+      // Add legend for countries
+      var legend = svg.selectAll(".legend")
+        .data(countries)
+        .enter().append("g")
+        .attr("class", "legend")
+        .attr("transform", function (d, i) { return "translate(" + (width + 10) + "," + (i * 20) + ")"; });
+
+      legend.append("rect")
+        .attr("x", 0)
+        .attr("width", 18)
+        .attr("height", 18)
+        .style("fill", colorScale);
+
+      legend.append("text")
+        .attr("x", 24)
+        .attr("y", 9)
+        .attr("dy", ".35em")
+        .style("text-anchor", "start")
+        .style("fill", "white")
+        .text(d => d);
+    });
+  </script>
+</body>
+
 </html>
