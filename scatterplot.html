@@ -1,0 +1,194 @@
+<html>
+  <head>
+    <!--- D3 IMPORT HERE --->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <!--- D3 IMPORT HERE --->
+    <style>
+      .gridlines line {
+        stroke: #ddd;
+      }
+  
+      .gridlines .domain {
+        stroke: none;
+      }
+  
+      .axis-label {
+        font-family: Arial, sans-serif;
+        font-size: 12px;
+        fill: black;
+      }
+  
+      .title {
+        font-size: 16px;
+        fill: black;
+        text-anchor: middle;
+      }
+  </style>
+  </head>
+  <body>
+    <svg id="scatterplot" height="500" width="800"></svg>
+    <svg id="legend" height="200" width="200" ></svg>
+    <script>
+      const svg = d3.select('svg#scatterplot');
+      const margin = {top: 20, right: 20, bottom: 80, left: 50};
+      const width = svg.attr('width');
+      const height = svg.attr('height');
+      const chartWidth = width - margin.left - margin.right;
+      const chartHeight = height - margin.top - margin.bottom;
+     
+      
+
+      const legendSvg = d3.select('svg#legend'); // Select the legend SV
+      let legend = svg.append("g")
+      .attr("id", "legend")
+      .attr("transform", `translate(${chartWidth - 1.5 * margin.right}, ${margin.top})`);
+      console.log(svg)
+    
+
+      d3.csv("scatterplot_data.csv").then((data)=> {
+        console.log(data);
+
+        let keys = Object.keys(data[0]); 
+        let allKeys = keys.slice(1);
+        let burnKeys = keys.slice(1, -2);
+        let co2AqiKeys = keys.slice(-2,-1);
+
+        data.forEach(d => {
+          allKeys.forEach(key => {
+              d[key] = +d[key]; 
+          });
+        });
+        //clean the dataset to remove values with zeros
+        const filteredData = data.filter(row => {
+            // Check if all values are valid (not empty or zero)
+            const isValidRow = keys.every(key => row[key] !== "" && row[key] !== 0);
+            return isValidRow;
+        });
+        // Console log to verify results
+        console.log("Keys:", co2AqiKeys);
+        console.log("Normal Data Lenght:", data.length);
+        console.log("Filtered Data Lenght:", filteredData.length);
+
+        
+
+        // X Scale
+        console.log(filteredData)
+        const allBurnedValues = filteredData.flatMap(row => 
+        burnKeys.map(column => row[column])
+        );
+        const burnedExtent = d3.extent(allBurnedValues);
+        console.log(burnedExtent)
+        const burnedScale = d3.scaleLog()
+  .domain([Math.max(1, burnedExtent[0] ), burnedExtent[1] ]) // Slight padding
+  .range([0, chartWidth]);
+        console.log(burnedScale)
+
+        // Y Scale
+        const allCo2AqiValues = filteredData.flatMap(row => 
+        co2AqiKeys.map(column => row[column])
+        );
+        console.log(allCo2AqiValues)
+        const co2AqiExtent = d3.extent(allCo2AqiValues);
+        // console.log(co2AqiExtent)
+        // const co2AqiScale = d3.scaleLinear()
+        //                     .domain(co2AqiExtent)
+        //                     .range([chartHeight,0])
+        // console.log(co2AqiScale)
+
+        const co2AqiScale = d3.scaleLog()
+  .domain([Math.max(1, co2AqiExtent[0] ), co2AqiExtent[1] ]) // Slight padding
+  .range([chartHeight, 0]);
+
+        const colorPalette = [
+        "#4f83cc", // ---Blue
+        "#ff4d4d", // Red
+        "#ff944d", // Orange
+        "#ffd700", // Yellow 
+        "#9b59b6", // Purple
+        "#ff8c00"  // Darker orange
+        ];
+            
+        // Colour-Scale for graph
+        const colorScale = d3.scaleOrdinal()
+        .domain(burnKeys)
+        .range(colorPalette);
+
+        const xAxis = d3.axisBottom(burnedScale)
+        .ticks(5, "~s") // Adjust to 5 ticks and use SI notation for clarity
+        .tickFormat(d => d3.format(".1s")(d)); // Format for fewer significant figures
+
+        svg.append("g")
+          .attr("transform", `translate(${margin.left},${margin.top + chartHeight - 10})`)
+          .call(xAxis)
+          .selectAll("text")
+          .style("fill", "black")
+          .style("font-size", "12px"); // Adjust font size if needed for readability
+
+      // Adjust Y axis for a logarithmic scale with fewer, readable ticks
+        const yAxis = d3.axisLeft(co2AqiScale)
+          .ticks(5, "~s") // Use 5 ticks with SI notation for readability
+          .tickFormat(d => d3.format(".1s")(d)); // Format for fewer significant figures
+
+        svg.append("g")
+          .attr("transform", `translate(${margin.left - 20}, 0)`)
+          .call(yAxis)
+          .selectAll("text")
+          .style("fill", "black")
+          .style("font-size", "12px"); // Adjust font size for readability
+
+          burnKeys.forEach(region => {
+          console.log("Region:", region);
+
+          // Create a unique selection for each region
+          svg.selectAll(`.circle-${region}`)
+            .data(filteredData) // Bind the data to the circles
+            .join("circle")
+            .attr("class", `circle-${region}`) // Add a unique class based on region
+            .attr("cx", d => burnedScale(d[region])) // X-axis: land area burned for the region
+            .attr("cy", d => co2AqiScale(d.CO2)) // Y-axis: CO2 or air quality
+            .attr("r", 5)
+            .attr("fill", colorScale(region)) // Color the circles based on land type
+            .attr("opacity", 0.7);
+          });
+
+          const legendWidth = legendSvg.attr("width");
+          const legendHeight = legendSvg.attr("height");
+      
+          legendSvg.selectAll("circle")
+          .data(burnKeys)
+          .join("circle")
+          .attr("cx",  0.2 * legendWidth)
+          .attr("cy", (d, i) => i * 25 + 10) // 100 is where the first dot appears. 25 is the distance between dots
+          .attr("r", "10")
+          .style("fill", d => colorScale(d))
+
+          
+          legendSvg.selectAll("text")
+          .data(burnKeys)
+          .join("text")
+          .attr("x", 0.2 * legendWidth + 20 ) // Position labels to the right of the dots
+          .attr("y", (d, i) => i * 25 + 10) // Align vertically with dots
+          .text(d => d)
+          .style("alignment-baseline", "middle")
+          .style("font-size", "12px")
+          .style("fill", d => colorScale(d));
+
+
+      
+
+
+
+
+
+        
+        
+
+
+    
+      
+      });
+    </script>
+
+
+  </body>
+</html>
