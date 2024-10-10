@@ -29,182 +29,235 @@
   <p style="margin-top: 50px;"> Wildfire Data Visualization </p>
 
   <!-- Create an SVG element with larger dimensions -->
-  <svg id="q2" height="700" width="1000" style="border: 1px solid black; background-color: black;"></svg>
+   
+  <svg id="graph" height="700" width="1000" style="border: 1px solid black"></svg>
+  <svg id="legend" height="150" width="150"></svg>
+  <svg id="comparison" height="200" width="200" style="position: absolute; top: 200px; right: 100px;"></svg>
 
   <script>
-    // Load data from CSV file
-    d3.csv('new_fire_data.csv').then((data) => {
-      // console.log(data);
+    // Set up SVG dimensions and margins
+    const margin = { top: 20, right: 30, bottom: 40, left: 70 };
+    const width =1000 - margin.left - margin.right;
+    const height = 700 - margin.top - margin.bottom;
 
-      // Set up the margins and dimensions of the chart
-      var margin = { top: 50, right: 150, bottom: 50, left: 100 };
-      var width = 1000 - margin.left - margin.right;
-      var height = 700 - margin.top - margin.bottom;
-
-      // Create the main SVG group element
-      var svg = d3.select("#q2")
+    // Append SVG and create a chart area within the margins
+    const svg = d3.select("svg#graph")
         .attr("width", width + margin.left + margin.right)
         .attr("height", height + margin.top + margin.bottom)
         .append("g")
-        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+        .attr("transform", `translate(${margin.left},${margin.top})`);
 
-      var countries = ['United States', 'Canada', 'Brazil', 'Australia'];
+    const legendSvg = d3.select('svg#legend'); // Select the legend SVG
+    // Calculate the position as a percentage of the main SVG's dimensions
+    const legendX = width * 0.01; // 80% from the left
+    const legendY = -height * 0.85; // 10% from the top
 
-      // Extend the years from 2010 to 2025
-      var years = [2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019,
-        2020, 2021, 2022, 2023, 2024];
+    // Apply the transform to position the legend
+    legendSvg.attr("transform", `translate(${legendX}, ${legendY})`);
+    
+    const compSvg = d3.select("svg#comparison")
+      .attr("width", 300) // Adjust as needed for label space
+      .attr("height", height*0.90)
+      .attr("transform", `translate(${-width*0.005},${-height*0.01})`)
+      .style("border", "1px solid black")
+      .append("g")
+      .attr("transform", `translate(${margin.left},${margin.top})`);
 
-      // Prepare the data by creating an array with country, year, and area burned values
+
+    // Load the data
+    d3.csv("reshaped_fire_data.csv").then(data => {
+    console.log(data)
+
+    const countriesOfInterest = ["United States", "Canada", "United Kingdom", "Russia", "Brazil"];
+    
+    // We want the year to be they keys because thats what's going on the x-axis
+
+    data.forEach(d => {
+        d.Year = +d.Year; // Convert Year to a number
+        countriesOfInterest.forEach(country => {
+            d[country] = +d[country]; // Convert each country's area burned values to numbers
+        });
+    });
 
     
-      var formattedData = [];
-      data.forEach(function (d) {
-        if (countries.includes(d.Entity)) {
-          console.log(d)
-          years.forEach(function (year) {
-            formattedData.push({
-              country: d.Entity,
-              year: year,
-              area: d[year.toString()] // Ensure numeric parsing
-            });
-          });
-        }
-      });
-      console.log(formattedData);
+    // Example: 
+    // data = {0:{Year:2012, Brazil:bxx, Canada: cxx}, 
+    //         1:{Year:2013, Brazil:byy, Canada: cyy},
+    //         2:{Year:2014, Brazil:bzz, Canada: czz}}
 
-      // Set up the x-axis with extended years (2010 to 2025)
-      var xScale = d3.scaleLinear()
-        .domain([2012, 2024])  // Extended domain for more years
-        .range([0, width]);
+    // when converted to a stack 
 
-      // Set up the y-axis to show a larger range of burned areas
-      var yScale = d3.scaleLinear()
-        .domain([0, d3.max(formattedData, d => +d.area) ])  // Extend domain for larger range
-        .range([height, 0]);
+    // stack(data) =[  [ [0, bxx, data[0]], 
+    //                   [0, byy, data[1]], 
+    //                   [0, bzz, data[2]]
+    //                 ], - Brazil   
+    //                 [
+    //                   [bxx, (cxx+bxx) , data[0]], 
+    //                   [byy, (cyy+byy) , data[1]], 
+    //                   [bzz, (czz+bzz) , data[2]] 
+    //                 ] - Canada
+    //               ]
 
-      var colorScale = d3.scaleOrdinal(d3.schemeSet2).domain(countries);
+    // https://using-d3js.com/05_06_stacks.html
 
-      // Add x-axis to the chart
-      var xAxis = d3.axisBottom(xScale).ticks(10).tickFormat(d3.format("d"));
-      svg.append("g")
-        .attr("transform", "translate(0," + height + ")")
+    // Applies the stack layout to the data, creating a series array where each entry represents one country's data for all years. Stack layout with countries as layers and years as x-axis categories
+    
+    const stack = d3.stack()
+        .keys(countriesOfInterest); // mark the countries as the stack layers
+    const series = stack(data);
+    console.log(series)
+    
+     // Define scales
+     // Creates a band scale for evenly spacing categories along the x-axis.
+    const xScale = d3.scaleBand()
+      .domain(data.map(d => d.Year))
+      .range([0, width])
+      .padding(0.2);
+
+    // we want to find what the maximum 'endpoint' would look like 
+    // we know that the series has the endpoint data, as something like '(cxx+bxx)'
+    // so we'll have to flatten the nested lists first then extract the maximum 'endpoint'
+    const maxY = d3.max(series.flat().map(d => d[1]))
+    console.log(maxY)
+    console.log(d3.min(series.flat().map(d => d[1])))
+    let yScale = d3.scaleLinear()
+      .domain([0, maxY])
+      .range([height, 0]); 
+        
+    const colorScale = d3.scaleOrdinal()
+        .domain(countriesOfInterest)
+        .range(d3.schemeCategory10);
+
+       
+    // Add X axis
+    var xAxis = d3.axisBottom(xScale).ticks(10).tickFormat(d3.format("d"));
+    svg.append("g")
+        .attr("transform", `translate(0,${margin.top+height-10})`)
         .call(xAxis)
         .selectAll("text")
-        .style("fill", "white");
+        .style("fill", "black");
 
-      // Add y-axis to the chart
-      var yAxis = d3.axisLeft(yScale);
+    // // Add Y axis
+    var yAxis = d3.axisLeft(yScale).ticks(6).tickFormat(d => d / 1000000 );
       svg.append("g")
         .call(yAxis)
         .selectAll("text")
-        .style("fill", "white");
+        .style("fill", "black");
 
-      // Add y-axis label
-      svg.append("text")
+    // Add y-axis label
+    svg.append("text")
         .attr("transform", "rotate(-90)")
         .attr("y", -70)
         .attr("x", -height / 2)
         .attr("dy", "1em")
-        .attr("fill", "white")
-        .text("Area Burned by Wildfires (ha)");
+        .attr("fill", "black")
+        .text("Area Burned by Wildfires (Mha)");
 
-      // Add chart title
-      svg.append("text")
-        .attr("x", width / 2)
-        .attr("y", -20)
-        .attr("class", "title")
-        .text("Area Burned by Wildfires in Selected Countries (2010-2025)");
-
-      // Add horizontal gridlines
-      var yGridlines = d3.axisLeft(yScale)
+    // Add horizontal gridlines
+    var yGridlines = d3.axisLeft(yScale)
         .tickSize(-width)
         .tickFormat("");
       svg.append("g")
         .attr("class", "gridlines")
         .call(yGridlines);
 
-      // Add vertical gridlines
-      var xGridlines = d3.axisBottom(xScale)
-        .tickSize(-height)
-        .tickFormat("")
-        .ticks(10);
-      svg.append("g")
-        .attr("class", "gridlines")
-        .attr("transform", "translate(0," + height + ")")
-        .call(xGridlines);
+    // Add stacked bars
+    svg.selectAll("g.layer")
+        .data(series)
+        .join("g")
+        .attr("class", "layer")
+        .attr("fill", d => colorScale(d.key))
+        .selectAll("rect")
+        .data(d => d)
+        .join("rect")
+        .attr("x", d => xScale(d.data.Year))
+        .attr("y", d => yScale(d[1]))
+        .attr("height", d => yScale(d[0]) - yScale(d[1]))
+        .attr("width", xScale.bandwidth());
 
-      // Define the line generator function for plotting data points
-      var line = d3.line()
-        .x(d => xScale(d.year))
-        .y(d => yScale(d.area));
 
-      // Nest data by country for separate lines
-      var nestedData = d3.groups(formattedData, d => d.country);
-      console.log(nestedData)
+        const legendWidth = legendSvg.attr("width");
+        const legendHeight = legendSvg.attr("height");
+        legendSvg.selectAll("circle")
+        .data(countriesOfInterest)
+        .join("circle")
+        .attr("cx",  0.1 * legendWidth)
+        .attr("cy", (d, i) => i * 25 + 10) // 100 is where the first dot appears. 25 is the distance between dots
+        .attr("r", "10")
+        .style("fill", colorScale)
 
-      // Draw lines and animate circles on data points
-      nestedData.forEach(function (countryData) {
-        var country = countryData[0];
-        var dataPoints = countryData[1];
-        dataPoints.forEach( function(d) {
-          console.log(d)
-          svg.append("line")
-          .attr("x1", xScale(d.year))
-          .attr("x2", xScale(d.year))
-          .attr("y1", height)
-          .attr("y2", yScale(d['area']))
-          .style("stroke",colorScale(country))
-          .style("stroke-width",10)
-        })
         
-
-        // // Draw line for each country
-        // svg.append("path")
-        //   .datum(dataPoints)
-        //   .attr("fill", "none")
-        //   .attr("stroke", colorScale(country))
-        //   .attr("stroke-width", 2)
-        //   .attr("d", line);
-
-        // // Draw circles on each data point with an animation
-        // svg.selectAll("circle." + country)
-        //   .data(dataPoints)
-        //   .enter()
-        //   .append("circle")
-        //   .attr("class", country)
-        //   .attr("cx", d => xScale(d.year))
-        //   .attr("cy", d => yScale(d.area))
-        //   .attr("r", 0)  // Start with radius 0
-        //   .style("fill", colorScale(country))
-        //   .style("stroke", "white")
-        //   .style("stroke-width", 1)
-        //   .transition()  // Animate the transition
-        //   .duration(1000)
-        //   .attr("r", 4);  // Animate to radius 4
-      });
-
-      // Add legend for countries
-      var legend = svg.selectAll(".legend")
-        .data(countries)
-        .enter().append("g")
-        .attr("class", "legend")
-        .attr("transform", function (d, i) { return "translate(" + (width + 10) + "," + (i * 20) + ")"; });
-
-      legend.append("rect")
-        .attr("x", 0)
-        .attr("width", 18)
-        .attr("height", 18)
+        legendSvg.selectAll("text")
+        .data(countriesOfInterest)
+        .join("text")
+        .attr("x", 0.1 * legendWidth + 20 ) // Position labels to the right of the dots
+        .attr("y", (d, i) => i * 25 + 10) // Align vertically with dots
+        .text(d => d)
+        .style("alignment-baseline", "middle")
+        .style("font-size", "12px")
         .style("fill", colorScale);
 
-      legend.append("text")
-        .attr("x", 24)
-        .attr("y", 9)
-        .attr("dy", ".35em")
-        .style("text-anchor", "start")
-        .style("fill", "white")
-        .text(d => d);
-    });
+
+// Define U.S.-related reference areas based on suggested sizes
+const referenceAreas = [
+    { name: "75,000 Football Fields", size: 50000000 },           // 50Mha
+    { name: "1.5 Californias", size: 100000000 },                 // 100Mha
+    { name: "Corn & Wheat Fields in U.S.", size: 200000000 },     // 200 Mha
+    { name: "Rocky Mountain Region", size: 300000000 },    // 300 Mha
+    { name: "Entire U.S.", size: 550000000 }                        // 550Mha
+];
+
+
+// Calculate the starting y-position of each rectangle based on cumulative height
+let cumulativeY = 0;
+
+// Create rectangles for each reference area, scaled to yScale
+compSvg.selectAll("rect")
+    .data(referenceAreas)
+    .join("rect")
+    .attr("x", -20) // Align rectangles to the left side of the comparison svg
+    .attr("y", d => {
+        let yPosition = cumulativeY;
+        cumulativeY += height - yScale(d.size) + 10; // Update cumulativeY for next rectangle (with spacing)
+        return yPosition;
+    })
+    .attr("width", xScale.bandwidth()) // Fixed width for visual consistency
+    .attr("height", d => height - yScale(d.size)) // Height scaled to y-axis
+    .attr("fill", "#69b3a2");
+
+// Reset cumulativeY for positioning text
+cumulativeY = 0;
+
+// Add labels for each reference area
+compSvg.selectAll("text")
+    .data(referenceAreas)
+    .join("text")
+    .attr("x", 40) // Position labels to the right of each rectangle
+    .attr("y", d => {
+        let yPosition = cumulativeY + 15; // Adjust to align with rectangle
+        cumulativeY += height - yScale(d.size) + 10; // Update cumulativeY for next label (with spacing)
+        return yPosition;
+    })
+    .text(d => `${d.name}: \n ${Math.round(d.size / 1000000)}M ha`)
+    .style("font-size", "12px")
+   
+    .style("font-family", "Courier") // Set font family
+    .style("font-weight", "bold") // Set font weight to bold
+    .style("fill", "darkgreen") // Set text color
+    .style("alignment-baseline", "middle");
+        });
+
+    // Add labels for each reference area
+
+
+        
+
+
+         
   </script>
+  
+  
+  
 </body>
 
 </html>

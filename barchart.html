@@ -1,0 +1,242 @@
+<html>
+  <head>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    .gridlines line {
+      stroke: #ddd;
+    }
+
+    .gridlines .domain {
+      stroke: none;
+    }
+
+    .axis-label {
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      fill: black;
+    }
+
+    .title {
+      font-size: 16px;
+      fill: black;
+      text-anchor: middle;
+    }
+  </style>
+  </head>
+
+  <body>
+    <p style="margin-top: 50px;">Wildfire Data Visualization</p>
+    <!-- Parent SVG container -->
+    <svg id="mainSVG" width="1400" height="800" ></svg>
+  </body>
+
+  <script>
+      // Set up the main SVG and dimensions
+      const mainSvg = d3.select("#mainSVG");
+
+      const margin = { top: 20, right: 30, bottom: 40, left: 70 };
+      const width = 1000 - margin.left - margin.right;
+      const height = 700 - margin.top - margin.bottom;
+
+
+      const countriesOfInterest = ["United States", "Canada", "Australia", "Russia", "Brazil"];
+      const referenceAreas = [
+        { name: "75,000 Football Fields", size: 50000000 },
+        { name: "1.5 Californias", size: 100000000 },
+        { name: "Corn & Wheat Fields in U.S.", size: 200000000 },
+        { name: "Rocky Mountain Region", size: 300000000 },
+        { name: "Entire U.S.", size: 550000000 }
+      ];
+
+      // 1. Graph Component
+      const graphGroup = mainSvg.append("g")
+      .attr("transform", `translate(${margin.left},${margin.top+ 100})`);
+      const graphWidth = width;
+      const graphHeight = height;
+
+      // 2. Legend Component
+      const legendGroup = mainSvg.append("g")
+      .attr("transform", `translate(${width + 80}, ${margin.top})`);
+
+      // 3. Comparison Component
+      const comparisonGroup = mainSvg.append("g")
+        .attr("transform", `translate(${width+150}, ${margin.top+180})`);
+
+    
+
+      // Loading and Manipulating Data
+      d3.csv("global_fire_data.csv").then(data => {
+        console.log(data);
+
+        //cleaing data
+        data.forEach(d => {
+          d.Year = +d.Year; // Convert Year to a number
+          countriesOfInterest.forEach(country => {
+              d[country] = +d[country]; // Convert each country's area burned values to numbers
+          });
+        });
+
+        const stack = d3.stack()
+                        .keys(countriesOfInterest); // mark the countries as the stack layers
+        const series = stack(data);
+        console.log(series);
+
+        // X-Scale for graph
+        const xScale = d3.scaleBand()
+        .domain(data.map(d => d.Year))
+        .range([0, graphWidth])
+        .padding(0.2);
+    
+        // Y-Scale for graph
+        const maxY = d3.max(series.flat().map(d => d[1]))
+        let yScale = d3.scaleLinear()
+          .domain([0, maxY])
+          .range([graphHeight, 0]); 
+
+          const colorPalette = [
+    "#4f83cc", // Blue
+    "#ff4d4d", // Red
+    "#ff944d", // Orange
+    "#ffd700", // Yellow (golden)
+    "#9b59b6", // Purple
+    "#ff8c00"  // Darker orange
+];
+            
+        // Colour-Scale for graph
+        const colorScale = d3.scaleOrdinal()
+        .domain(countriesOfInterest)
+        .range(colorPalette);
+
+        // Add X axis
+        const xAxis = d3.axisBottom(xScale).ticks(10).tickFormat(d3.format("d"));
+        graphGroup.append("g")
+            .attr("transform", `translate(0,${margin.top+height-10})`)
+            .call(xAxis)
+            .selectAll("text")
+            .style("fill", "black");
+
+        // Add Y axis
+        var yAxis = d3.axisLeft(yScale).ticks(6).tickFormat(d => d / 1000000 );
+          graphGroup.append("g")
+            .call(yAxis)
+            .selectAll("text")
+            .style("fill", "black");
+
+        // Add y-axis label
+        graphGroup.append("text")
+            .attr("transform", "rotate(-90)")
+            .attr("y", -70)
+            .attr("x", -height / 2)
+            .attr("dy", "1em")
+            .attr("fill", "black")
+            .text("Area Burned by Wildfires (Mha)");
+
+        // Add horizontal gridlines
+        var yGridlines = d3.axisLeft(yScale)
+            .tickSize(-width)
+            .tickFormat("");
+            graphGroup.append("g")
+            .attr("class", "gridlines")
+            .call(yGridlines);
+
+          // Graph bars and axes
+        graphGroup.selectAll("g.layer")
+          .data(series)
+          .join("g")
+          .attr("class", "layer")
+          .attr("fill", d => colorScale(d.key))
+          .selectAll("rect")
+          .data(d => d)
+          .join("rect")
+          .attr("x", d => xScale(d.data.Year))
+          .attr("y", d => yScale(d[1]))
+          .attr("height", d => yScale(d[0]) - yScale(d[1]))
+          .attr("width", xScale.bandwidth())
+          .attr("rx", 5) 
+          .attr("ry", 5);
+
+          // LEGEND 
+          const legendWidth = legendGroup.attr("width");
+          const legendHeight = legendGroup.attr("height");
+          legendGroup.selectAll("rect")
+          .data(countriesOfInterest)
+          .join("rect")
+          .attr("x",  0.5 * legendWidth)
+          .attr("y", (d, i) => i * 25 + 5)
+          .attr("width", 10) // Fixed width for visual consistency
+          .attr("height", 10)
+          .attr("rx", 2) 
+          .attr("ry", 2)
+          .attr("fill", colorScale);
+
+          
+          legendGroup.selectAll("text")
+          .data(countriesOfInterest)
+          .join("text")
+          .attr("x", 0.1 * legendWidth + 20 ) // Position labels to the right of the dots
+          .attr("y", (d, i) => i * 25 + 10) // Align vertically with dots
+          .text(d => d)
+          .style("alignment-baseline", "middle")
+          .style("font-family", "Courier") 
+          .style("font-weight", "bold") 
+          .style("fill", "darkgreen")
+          .style("font-size", "12px")
+          .style("fill", colorScale);
+
+
+          // 3. Comparison Component
+          // Calculate the starting y-position of each rectangle based on cumulative height
+          let cumulativeY = 0;
+          
+
+          // Create rectangles for each reference area, scaled to yScale
+          comparisonGroup.selectAll("rect")
+              .data(referenceAreas)
+              .join("rect")
+              .attr("x", -20) // Align rectangles to the left side of the comparison svg
+              .attr("y", d => {
+                  let yPosition = cumulativeY;
+                  cumulativeY += height - yScale(d.size) + 10; // Update cumulativeY for next rectangle (with spacing)
+                  return yPosition;
+              })
+              .attr("width", xScale.bandwidth()) // Fixed width for visual consistency
+              .attr("height", d => height - yScale(d.size)) // Height scaled to y-axis
+              .attr("fill", "#33cc99") 
+              .attr("rx", 5) 
+              .attr("ry", 5);
+
+            // Reset cumulativeY for positioning text
+            cumulativeY = 0;
+
+            // Add labels for each reference area
+            comparisonGroup.selectAll("text")
+                .data(referenceAreas)
+                .join("text")
+                .attr("x", 45) // Position labels to the right of each rectangle
+                .attr("y", d => {
+                    let yPosition = cumulativeY +5; // Adjust to align with rectangle
+                    cumulativeY += height - yScale(d.size) + 10; // Update cumulativeY for next label (with spacing)
+                    return yPosition;
+                })
+                .text(d => `${d.name}: \n ${Math.round(d.size / 1000000)}M ha`)
+                .style("font-size", "12px")
+              
+                .style("font-family", "Courier") 
+                .style("font-weight", "bold") 
+                .style("fill", "darkgreen")
+                .style("alignment-baseline", "middle");
+                
+            // Title for Comparison Chart 
+            comparisonGroup.append("text")
+            .attr("x", 120) 
+            .attr("y", -20) 
+            .attr("class", "title") 
+            .text("Chart for Comparison")
+            .style("font-family", "Courier") 
+            .style("font-weight", "bold") 
+            .style("fill", "darkgreen") 
+});
+
+
+  </script>
+</html>
