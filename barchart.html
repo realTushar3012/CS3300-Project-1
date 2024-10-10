@@ -212,7 +212,7 @@
             comparisonGroup.selectAll("text")
                 .data(referenceAreas)
                 .join("text")
-                .attr("x", 45) // Position labels to the right of each rectangle
+                .attr("x", 40) // Position labels to the right of each rectangle
                 .attr("y", d => {
                     let yPosition = cumulativeY +5; // Adjust to align with rectangle
                     cumulativeY += height - yScale(d.size) + 10; // Update cumulativeY for next label (with spacing)
