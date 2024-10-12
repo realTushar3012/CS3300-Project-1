@@ -1,0 +1,126 @@
+<html>
+  <head>
+    <!-- D3 IMPORT HERE -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <!-- D3 IMPORT HERE -->
+    <style>
+      .axis-label {
+        font-family: Arial, sans-serif;
+        font-size: 12px;
+        fill: black;
+      }
+      .title {
+        font-size: 16px;
+        fill: black;
+        text-anchor: middle;
+      }
+      .legend text {
+        font-size: 12px;
+        fill: black;
+      }
+    </style>
+  </head>
+  <body>
+    <svg id="heatmap" height="500" width="800"></svg>
+    <script>
+      const svg = d3.select("#heatmap"),
+            margin = {top: 50, right: 20, bottom: 100, left: 100},
+            width = svg.attr("width") - margin.left - margin.right,
+            height = svg.attr("height") - margin.top - margin.bottom;
+
+      const chart = svg.append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+
+      // Load and clean data
+      d3.csv("area-burned-wildfires-by-type (1).csv").then((data) => {
+        // Filter and aggregate data by continent as described
+        const targetContinents = ["Asia", "Africa", "South America", "North America", "Australia", "Europe"];
+        const columnsToSum = [
+          "Yearly burned area across shrublands and grasslands",
+          "Yearly burned area across savannas",
+          "Yearly burned area across forests",
+          "Yearly burned area across croplands"
+        ];
+
+        const filteredData = data.filter(d => targetContinents.includes(d.Entity.trim()));
+
+        const aggregatedData = targetContinents.map(continent => {
+          const continentData = filteredData.filter(d => d.Entity.trim() === continent);
+          const totals = columnsToSum.reduce((acc, column) => {
+            acc[column] = d3.sum(continentData, d => +d[column] || 0);
+            return acc;
+          }, {});
+          return { Entity: continent, ...totals };
+        });
+
+        // Define heatmap dimensions
+        const continents = targetContinents;
+        const landTypes = columnsToSum.map(column => column.replace("Yearly burned area across ", ""));
+
+        // Create a color scale based on values
+        console.log(d => d3.max(columnsToSum.map(type => d[type])))
+        const colorScale = d3.scaleSequential(d3.interpolateOrRd)
+          .domain([0, 390000000]);
+        
+        // X and Y scales
+        const xScale = d3.scaleBand()
+          .domain(continents)
+          .range([0, width])
+          .padding(0.05);
+
+        const yScale = d3.scaleBand()
+          .domain(landTypes)
+          .range([0, height])
+          .padding(0.05);
+
+        // X and Y Axes
+        chart.append("g")
+          .attr("transform", `translate(0,${height})`)
+          .call(d3.axisBottom(xScale))
+          .selectAll("text")
+          .attr("transform", "rotate(-45)")
+          .style("text-anchor", "end");
+
+        chart.append("g")
+          .call(d3.axisLeft(yScale));
+
+        // Create heatmap rectangles
+        aggregatedData.forEach(d => {
+          columnsToSum.forEach((type, i) => {
+            chart.append("rect")
+              .attr("x", xScale(d.Entity))
+              .attr("y", yScale(type.replace("Yearly burned area across ", "")))
+              .attr("width", xScale.bandwidth())
+              .attr("height", yScale.bandwidth())
+              .attr("fill", colorScale(d[type]));
+          });
+        });
+
+        // Add a legend
+        const legendWidth = 20;
+        const legendHeight = 200;
+
+        const legend = svg.append("g")
+          .attr("transform", `translate(${width + margin.left + 20}, ${margin.top})`);
+
+        const legendScale = d3.scaleLinear()
+          .domain(colorScale.domain())
+          .range([legendHeight, 0]);
+
+        const legendAxis = d3.axisRight(legendScale).ticks(5);
+
+        legend.selectAll("rect")
+          .data(d3.range(legendHeight), d => d)
+          .enter().append("rect")
+          .attr("y", d => legendHeight - d)
+          .attr("width", legendWidth)
+          .attr("height", 1)
+          .attr("fill", d => colorScale(legendScale.invert(d)));
+
+        legend.append("g")
+          .attr("transform", `translate(${legendWidth}, 0)`)
+          .call(legendAxis);
+      });
+    </script>
+  </body>
+</html>

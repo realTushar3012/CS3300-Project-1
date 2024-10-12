@@ -1,57 +1,11 @@
-<html>
-<head>
-  <script src="https://d3js.org/d3.v7.min.js"></script>
-  <style>
-    .gridlines line {
-      stroke: #ddd;
-    }
+// GlobalFireChart.js
 
-    .gridlines .domain {
-      stroke: none;
-    }
+// Import D3
+import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 
-    .axis-label {
-      font-family: 'Verdana', sans-serif;
-      font-size: 14px;
-      fill: black;
-    }
-
-    .title {
-      font-family: 'Verdana', sans-serif;
-      font-size: 36px;
-      font-weight: bold;
-      fill: black;
-      text-anchor: middle;
-    }
-
-    .legend {
-      font-family: 'Verdana', sans-serif;
-      font-size: 14px;
-    }
-
-    .comparison-title {
-      font-family: 'Verdana', sans-serif;
-      font-size: 18px;
-      font-weight: bold;
-      fill: darkgreen;
-      text-anchor: middle;
-    }
-
-    .tick {
-      font-family: 'Verdana', sans-serif;
-      font-size: 14px;
-      fill: black;
-    }
-  </style>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
-</head>
-
-<body>
-  <svg id="mainSVG" width="1400" height="800"></svg>
-</body>
-
-<script>
-  const mainSvg = d3.select("#mainSVG");
+// Define and export the chart component function
+export function renderGlobalFireChart(svgId, csvPath) {
+  const mainSvg = d3.select(`#${svgId}`);
 
   const margin = { top: 80, right: 30, bottom: 70, left: 70 };
   const width = 1000 - margin.left - margin.right;
@@ -66,22 +20,19 @@
     { name: "Entire U.S.", size: 550000000 }
   ];
 
-  // Shifted the graph group to the right by increasing the x-offset in the transform
   const graphGroup = mainSvg.append("g")
-    .attr("transform", `translate(${margin.left + 50},${margin.top + 50})`); // Adjusted by +50
+    .attr("transform", `translate(${margin.left + 50},${margin.top + 50})`);
 
   const graphWidth = width;
   const graphHeight = height;
 
-  // Shifted the graph title to the right by increasing the x value
   mainSvg.append("text")
-    .attr("x", (margin.left + width + 200) / 2) // Shifted by +50
+    .attr("x", (margin.left + width + 200) / 2)
     .attr("y", margin.top + 20)
     .attr("class", "title")
     .text("Wildfire Area Burned by Year (2012-2023)");
 
-  d3.csv("global_fire_data.csv").then(data => {
-    console.log(data)
+  d3.csv(csvPath).then(data => {
     data.forEach(d => {
       d.Year = +d.Year;
       countriesOfInterest.forEach(country => {
@@ -233,6 +184,4 @@
       .attr("class", "legend")
       .text(d => d);
   });
-</script>
-
-</html>
+}
